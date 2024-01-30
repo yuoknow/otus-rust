@@ -1,6 +1,28 @@
 use std::collections::{HashMap, HashSet};
+use std::error::Error;
+use std::fmt::Display;
 
 use crate::house::devices::device::Device;
+use crate::house::smart_house::SmartHouseError::{DeviceNotFound, RoomNotFound};
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum SmartHouseError {
+    DeviceNotFound { room: String, device: String },
+    RoomNotFound(String),
+}
+
+impl Error for SmartHouseError {}
+
+impl Display for SmartHouseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DeviceNotFound { room, device } => {
+                write!(f, "Device [{}] not found in room [{}]", device, room)
+            }
+            RoomNotFound(room) => write!(f, "Room not found: [{}]", room),
+        }
+    }
+}
 
 pub struct SmartHouse {
     name: String,
@@ -35,20 +57,30 @@ impl SmartHouse {
                 "Device {} from {} status: {:?}\n",
                 device.1,
                 device.0,
-                &self.find_device(device.0.as_str(), device.1.as_str())
+                match &self.find_device(device.0.as_str(), device.1.as_str()) {
+                    Ok(result) => {
+                        result.to_string()
+                    }
+                    Err(error) => {
+                        error.to_string()
+                    }
+                }
             );
         }
 
         report
     }
 
-    fn find_device(&self, room: &str, device: &str) -> String {
-        match &self.rooms.get(room) {
+    fn find_device(&self, room_str: &str, device: &str) -> Result<String, SmartHouseError> {
+        match self.rooms.get(room_str) {
             Some(room) => match room.devices.get(device) {
-                Some(device) => device.status(),
-                None => "Device not found".to_string(),
+                Some(device) => Ok(device.status()),
+                None => Err(DeviceNotFound {
+                    room: room_str.to_string(),
+                    device: device.to_string(),
+                }),
             },
-            None => "Room not found".to_string(),
+            None => Err(RoomNotFound(room_str.to_string())),
         }
     }
 }
@@ -58,6 +90,7 @@ mod tests {
     use crate::house::devices::device::Device;
     use std::collections::{HashMap, HashSet};
 
+    use crate::house::smart_house::SmartHouseError::{DeviceNotFound, RoomNotFound};
     use crate::house::smart_house::{Room, SmartHouse};
 
     #[test]
@@ -79,7 +112,10 @@ mod tests {
 
         let house = SmartHouse::new(rooms);
 
-        assert_eq!(house.get_rooms(), HashSet::from([&"Room1".to_string(), &"Room2".to_string()]));
+        assert_eq!(
+            house.get_rooms(),
+            HashSet::from([&"Room1".to_string(), &"Room2".to_string()])
+        );
     }
 
     #[test]
@@ -123,7 +159,7 @@ mod tests {
 
         assert_eq!(
             house.find_device("Room1", "Thermo"),
-            "SmartThermometer { _current_temperature: 0.0 }"
+            Ok("SmartThermometer { _current_temperature: 0.0 }".to_string())
         );
     }
 
@@ -137,7 +173,13 @@ mod tests {
         )]);
         let house = SmartHouse::new(rooms);
 
-        assert_eq!(house.find_device("Room1", "Thermo"), "Device not found");
+        assert_eq!(
+            house.find_device("Room1", "Thermo"),
+            Err(DeviceNotFound {
+                room: "Room1".to_string(),
+                device: "Thermo".to_string()
+            })
+        );
     }
 
     #[test]
@@ -150,6 +192,9 @@ mod tests {
         )]);
         let house = SmartHouse::new(rooms);
 
-        assert_eq!(house.find_device("Room2", "Thermo"), "Room not found");
+        assert_eq!(
+            house.find_device("Room2", "Thermo"),
+            Err(RoomNotFound("Room2".to_string()))
+        );
     }
 }

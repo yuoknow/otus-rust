@@ -41,7 +41,7 @@ mod tests {
 
         socket._enable();
 
-        assert_eq!(socket._is_enabled(), true);
+        assert!(socket._is_enabled());
     }
 
     #[test]
@@ -54,6 +54,6 @@ mod tests {
 
         socket._disable();
 
-        assert_eq!(socket._is_enabled(), false);
+        assert!(!socket._is_enabled());
     }
 }
