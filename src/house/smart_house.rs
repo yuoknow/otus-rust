@@ -1,14 +1,19 @@
+use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fmt::Display;
 
 use crate::house::devices::device::Device;
-use crate::house::smart_house::SmartHouseError::{DeviceNotFound, RoomNotFound};
+use crate::house::smart_house::SmartHouseError::{
+    DeviceAlreadyExists, DeviceNotFound, RoomAlreadyExists, RoomNotFound,
+};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum SmartHouseError {
     DeviceNotFound { room: String, device: String },
     RoomNotFound(String),
+    RoomAlreadyExists(String),
+    DeviceAlreadyExists { room: String, device: String },
 }
 
 impl Error for SmartHouseError {}
@@ -20,6 +25,10 @@ impl Display for SmartHouseError {
                 write!(f, "Device [{}] not found in room [{}]", device, room)
             }
             RoomNotFound(room) => write!(f, "Room not found: [{}]", room),
+            RoomAlreadyExists(room) => write!(f, "Room already exists: [{}]", room),
+            DeviceAlreadyExists { room, device } => {
+                write!(f, "Device [{}] already exists in room [{}] ", device, room)
+            }
         }
     }
 }
@@ -29,15 +38,102 @@ pub struct SmartHouse {
     rooms: HashMap<String, Room>,
 }
 
+impl Default for SmartHouse {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct Room {
     pub devices: HashMap<String, Device>,
 }
 
+impl Default for Room {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Room {
+    pub fn new() -> Self {
+        Self {
+            devices: HashMap::new(),
+        }
+    }
+}
+
 impl SmartHouse {
-    pub fn new(rooms: HashMap<String, Room>) -> Self {
+    pub fn new() -> Self {
+        Self {
+            name: "My house".to_string(),
+            rooms: HashMap::new(),
+        }
+    }
+
+    pub fn of(rooms: HashMap<String, Room>) -> Self {
         Self {
             name: "My house".to_string(),
             rooms,
+        }
+    }
+
+    pub fn add_room(&mut self, room: String) -> Result<(), SmartHouseError> {
+        match self.rooms.entry(room) {
+            Entry::Occupied(room) => Err(RoomAlreadyExists(room.key().to_string())),
+            Entry::Vacant(vacant) => {
+                vacant.insert(Room::new());
+                Ok(())
+            }
+        }
+    }
+
+    pub fn remove_room(&mut self, room: String) -> Result<(), SmartHouseError> {
+        match self.rooms.entry(room) {
+            Entry::Occupied(room) => {
+                room.remove();
+                Ok(())
+            }
+            Entry::Vacant(vacant) => Err(RoomNotFound(vacant.key().to_string())),
+        }
+    }
+
+    pub fn add_device(
+        &mut self,
+        room: String,
+        device_name: String,
+        device: Device,
+    ) -> Result<(), SmartHouseError> {
+        match self.rooms.get_mut(&room) {
+            None => Err(RoomNotFound(room)),
+            Some(some) => {
+                // let mut devices = some.devices;
+                match some.devices.entry(device_name) {
+                    Entry::Occupied(device) => Err(DeviceAlreadyExists {
+                        device: device.key().to_string(),
+                        room,
+                    }),
+                    Entry::Vacant(vacant) => {
+                        vacant.insert(device);
+                        Ok(())
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn remove_device(&mut self, room: String, device: String) -> Result<(), SmartHouseError> {
+        match self.rooms.get_mut(&room) {
+            None => Err(RoomNotFound(room)),
+            Some(some) => match some.devices.entry(device) {
+                Entry::Occupied(device) => {
+                    device.remove();
+                    Ok(())
+                }
+                Entry::Vacant(vacant) => Err(DeviceNotFound {
+                    room,
+                    device: vacant.key().to_string(),
+                }),
+            },
         }
     }
 
@@ -87,10 +183,12 @@ impl SmartHouse {
 
 #[cfg(test)]
 mod tests {
-    use crate::house::devices::device::Device;
     use std::collections::{HashMap, HashSet};
 
-    use crate::house::smart_house::SmartHouseError::{DeviceNotFound, RoomNotFound};
+    use crate::house::devices::device::Device;
+    use crate::house::smart_house::SmartHouseError::{
+        DeviceAlreadyExists, DeviceNotFound, RoomAlreadyExists, RoomNotFound,
+    };
     use crate::house::smart_house::{Room, SmartHouse};
 
     #[test]
@@ -110,7 +208,7 @@ mod tests {
             ),
         ]);
 
-        let house = SmartHouse::new(rooms);
+        let house = SmartHouse::of(rooms);
 
         assert_eq!(
             house.get_rooms(),
@@ -136,7 +234,7 @@ mod tests {
             },
         )]);
 
-        let house = SmartHouse::new(rooms);
+        let house = SmartHouse::of(rooms);
 
         assert_eq!(
             house.get_devices("Room1"),
@@ -155,7 +253,7 @@ mod tests {
                 )]),
             },
         )]);
-        let house = SmartHouse::new(rooms);
+        let house = SmartHouse::of(rooms);
 
         assert_eq!(
             house.find_device("Room1", "Thermo"),
@@ -171,13 +269,13 @@ mod tests {
                 devices: HashMap::new(),
             },
         )]);
-        let house = SmartHouse::new(rooms);
+        let house = SmartHouse::of(rooms);
 
         assert_eq!(
             house.find_device("Room1", "Thermo"),
             Err(DeviceNotFound {
                 room: "Room1".to_string(),
-                device: "Thermo".to_string()
+                device: "Thermo".to_string(),
             })
         );
     }
@@ -190,11 +288,124 @@ mod tests {
                 devices: HashMap::new(),
             },
         )]);
-        let house = SmartHouse::new(rooms);
+        let house = SmartHouse::of(rooms);
 
         assert_eq!(
             house.find_device("Room2", "Thermo"),
             Err(RoomNotFound("Room2".to_string()))
+        );
+    }
+
+    #[test]
+    fn should_add_new_room() {
+        let mut house = SmartHouse::new();
+        house.add_room("Room1".to_string()).unwrap();
+
+        assert_eq!(house.get_rooms(), HashSet::from([&"Room1".to_string()]));
+    }
+
+    #[test]
+    fn should_not_add_the_same_room() {
+        let mut house = SmartHouse::new();
+        house.add_room("Room1".to_string()).unwrap();
+
+        assert_eq!(
+            house.add_room("Room1".to_string()),
+            Err(RoomAlreadyExists("Room1".to_string()))
+        );
+    }
+
+    #[test]
+    fn should_remove_room() {
+        let mut house = SmartHouse::new();
+        house.add_room("Room1".to_string()).unwrap();
+        house.remove_room("Room1".to_string()).unwrap();
+
+        assert_eq!(house.get_rooms(), HashSet::from([]));
+    }
+
+    #[test]
+    fn should_not_remove_room_if_no_room() {
+        let mut house = SmartHouse::new();
+
+        assert_eq!(
+            house.remove_room("Room1".to_string()),
+            Err(RoomNotFound("Room1".to_string()))
+        );
+    }
+
+    #[test]
+    fn should_add_device_to_room() {
+        let mut house = SmartHouse::new();
+        house.add_room("Room1".to_string()).unwrap();
+        house
+            .add_device(
+                "Room1".to_string(),
+                "Thermo".to_string(),
+                Device::SmartThermometer(Default::default()),
+            )
+            .unwrap();
+
+        assert_eq!(
+            house.get_devices("Room1"),
+            HashSet::from([&"Thermo".to_string()])
+        );
+    }
+
+    #[test]
+    fn should_not_add_the_same_device_to_room() {
+        let mut house = SmartHouse::new();
+        house.add_room("Room1".to_string()).unwrap();
+        house
+            .add_device(
+                "Room1".to_string(),
+                "Thermo".to_string(),
+                Device::SmartThermometer(Default::default()),
+            )
+            .unwrap();
+
+        assert_eq!(
+            house.add_device(
+                "Room1".to_string(),
+                "Thermo".to_string(),
+                Device::SmartThermometer(Default::default())
+            ),
+            Err(DeviceAlreadyExists {
+                room: "Room1".to_string(),
+                device: "Thermo".to_string()
+            })
+        );
+    }
+
+    #[test]
+    fn should_remove_device() {
+        let mut house = SmartHouse::new();
+        house.add_room("Room1".to_string()).unwrap();
+        house
+            .add_device(
+                "Room1".to_string(),
+                "Thermo".to_string(),
+                Device::SmartThermometer(Default::default()),
+            )
+            .unwrap();
+        house
+            .remove_device("Room1".to_string(), "Thermo".to_string())
+            .unwrap();
+
+        assert_eq!(house.get_devices("Room1"), HashSet::from([]));
+    }
+
+    #[test]
+    fn should_not_remove_device_if_no_device() {
+        let mut house = SmartHouse::new();
+        house.add_room("Room1".to_string()).unwrap();
+
+        assert_eq!(
+            house.remove_device("Room1".to_string(), "Thermo".to_string()),
+            Err(DeviceNotFound {
+                device: "Thermo".to_string(),
+                room: "Room1".to_string()
+            })
         );
     }
 }

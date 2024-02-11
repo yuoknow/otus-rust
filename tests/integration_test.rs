@@ -15,7 +15,7 @@ fn should_create_report() {
             )]),
         },
     )]);
-    let house = SmartHouse::new(rooms);
+    let house = SmartHouse::of(rooms);
 
     assert_eq!(
         house.create_report(Vec::from([("Room1".to_string(), "Thermo".to_string())])),
