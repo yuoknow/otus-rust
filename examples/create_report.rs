@@ -1,8 +1,7 @@
 use smart_house::house::devices::device::Device;
 use smart_house::house::devices::smart_socket::SmartSocket;
 use smart_house::house::devices::smart_thermometer::SmartThermometer;
-use smart_house::house::smart_house::{Room, SmartHouse};
-use std::collections::HashMap;
+use smart_house::house::smart_house::SmartHouse;
 
 fn main() {
     let socket1 = SmartSocket {
@@ -19,20 +18,32 @@ fn main() {
         _current_temperature: 20.0,
     };
 
-    let room1 = Room {
-        devices: HashMap::from([
-            ("Socket1".to_string(), Device::SmartSocket(socket1)),
-            ("Thermo".to_string(), Device::SmartThermometer(thermo)),
-        ]),
-    };
+    let mut house = SmartHouse::new();
+    house.add_room("Room1".to_string()).unwrap();
+    house
+        .add_device(
+            "Room1".to_string(),
+            "Socket1".to_string(),
+            Device::SmartSocket(socket1),
+        )
+        .unwrap();
+    house
+        .add_device(
+            "Room1".to_string(),
+            "Thermo".to_string(),
+            Device::SmartThermometer(thermo),
+        )
+        .unwrap();
 
-    let room2 = Room {
-        devices: HashMap::from([("Socket2".to_string(), Device::SmartSocket(socket2))]),
-    };
+    house.add_room("Room2".to_string()).unwrap();
+    house
+        .add_device(
+            "Room2".to_string(),
+            "Socket2".to_string(),
+            Device::SmartSocket(socket2),
+        )
+        .unwrap();
 
-    let rooms = HashMap::from([("Room1".to_string(), room1), ("Room2".to_string(), room2)]);
-
-    let house = SmartHouse::new(rooms);
     let rooms = house.get_rooms();
 
     println!("Rooms: {:?}", rooms);
