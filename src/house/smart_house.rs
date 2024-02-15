@@ -106,7 +106,6 @@ impl SmartHouse {
         match self.rooms.get_mut(&room) {
             None => Err(RoomNotFound(room)),
             Some(some) => {
-                // let mut devices = some.devices;
                 match some.devices.entry(device_name) {
                     Entry::Occupied(device) => Err(DeviceAlreadyExists {
                         device: device.key().to_string(),
