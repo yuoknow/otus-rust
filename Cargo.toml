@@ -1,6 +1,6 @@
 [workspace]
 
 members = [
-    "smart_socket_client",
-    "smart_socket"
+    "temperature_source",
+    "smart_thermometer"
 ]
