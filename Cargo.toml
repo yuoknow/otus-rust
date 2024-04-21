@@ -2,5 +2,7 @@
 
 members = [
     "temperature_source",
-    "smart_thermometer"
-]
+    "smart_thermometer",
+    "smart_socket",
+    "smart_socket_client"]
+resolver = "2"
