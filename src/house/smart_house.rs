@@ -1,36 +1,23 @@
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
-use std::error::Error;
-use std::fmt::Display;
+
+use thiserror::Error;
 
 use crate::house::devices::device::Device;
 use crate::house::smart_house::SmartHouseError::{
     DeviceAlreadyExists, DeviceNotFound, RoomAlreadyExists, RoomNotFound,
 };
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum SmartHouseError {
+    #[error("Device [{device}] not found in room [{room}]")]
     DeviceNotFound { room: String, device: String },
+    #[error("Room not found: [{0}]")]
     RoomNotFound(String),
+    #[error("Room already exists: [{0}]")]
     RoomAlreadyExists(String),
+    #[error("Device [{device}] already exists in room [{room}]")]
     DeviceAlreadyExists { room: String, device: String },
-}
-
-impl Error for SmartHouseError {}
-
-impl Display for SmartHouseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            DeviceNotFound { room, device } => {
-                write!(f, "Device [{}] not found in room [{}]", device, room)
-            }
-            RoomNotFound(room) => write!(f, "Room not found: [{}]", room),
-            RoomAlreadyExists(room) => write!(f, "Room already exists: [{}]", room),
-            DeviceAlreadyExists { room, device } => {
-                write!(f, "Device [{}] already exists in room [{}] ", device, room)
-            }
-        }
-    }
 }
 
 pub struct SmartHouse {
@@ -105,18 +92,16 @@ impl SmartHouse {
     ) -> Result<(), SmartHouseError> {
         match self.rooms.get_mut(&room) {
             None => Err(RoomNotFound(room)),
-            Some(some) => {
-                match some.devices.entry(device_name) {
-                    Entry::Occupied(device) => Err(DeviceAlreadyExists {
-                        device: device.key().to_string(),
-                        room,
-                    }),
-                    Entry::Vacant(vacant) => {
-                        vacant.insert(device);
-                        Ok(())
-                    }
+            Some(some) => match some.devices.entry(device_name) {
+                Entry::Occupied(device) => Err(DeviceAlreadyExists {
+                    device: device.key().to_string(),
+                    room,
+                }),
+                Entry::Vacant(vacant) => {
+                    vacant.insert(device);
+                    Ok(())
                 }
-            }
+            },
         }
     }
 
