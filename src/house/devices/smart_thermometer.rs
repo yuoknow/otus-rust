@@ -1,4 +1,6 @@
-#[derive(Debug, Default)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct SmartThermometer {
     pub _current_temperature: f64,
 }

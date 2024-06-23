@@ -1,6 +1,8 @@
 use crate::house::devices::smart_socket::SmartSocket;
 use crate::house::devices::smart_thermometer::SmartThermometer;
+use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Device {
     SmartSocket(SmartSocket),
     SmartThermometer(SmartThermometer),

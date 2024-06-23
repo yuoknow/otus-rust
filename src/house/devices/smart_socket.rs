@@ -1,4 +1,6 @@
-#[derive(Debug, Default)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct SmartSocket {
     pub _description: String,
     pub _is_enabled: bool,

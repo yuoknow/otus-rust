@@ -1,6 +1,7 @@
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::house::devices::device::Device;
@@ -8,7 +9,7 @@ use crate::house::smart_house::SmartHouseError::{
     DeviceAlreadyExists, DeviceNotFound, RoomAlreadyExists, RoomNotFound,
 };
 
-#[derive(Error, Debug, PartialEq, Eq)]
+#[derive(Error, Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum SmartHouseError {
     #[error("Device [{device}] not found in room [{room}]")]
     DeviceNotFound { room: String, device: String },
@@ -127,6 +128,24 @@ impl SmartHouse {
 
     pub fn get_devices(&self, room: &str) -> HashSet<&String> {
         self.rooms[room].devices.keys().collect()
+    }
+
+    pub fn get_all_devices(&self) -> Vec<(String, String)> {
+        let mut devices = Vec::new();
+        for room in &self.rooms {
+            for device in &room.1.devices {
+                devices.push((room.0.to_string(), device.0.to_string()))
+            }
+        }
+        devices
+    }
+
+    pub fn get_device(&self, room: &str, device: &str) -> Device {
+        self.rooms[room].devices.get(device).unwrap().clone()
+    }
+
+    pub fn create_all_devices_report(&self) -> String {
+        self.create_report(self.get_all_devices())
     }
 
     pub fn create_report(&self, devices: Vec<(String, String)>) -> String {
@@ -352,11 +371,11 @@ mod tests {
             house.add_device(
                 "Room1".to_string(),
                 "Thermo".to_string(),
-                Device::SmartThermometer(Default::default())
+                Device::SmartThermometer(Default::default()),
             ),
             Err(DeviceAlreadyExists {
                 room: "Room1".to_string(),
-                device: "Thermo".to_string()
+                device: "Thermo".to_string(),
             })
         );
     }
@@ -388,7 +407,7 @@ mod tests {
             house.remove_device("Room1".to_string(), "Thermo".to_string()),
             Err(DeviceNotFound {
                 device: "Thermo".to_string(),
-                room: "Room1".to_string()
+                room: "Room1".to_string(),
             })
         );
     }
